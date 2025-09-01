@@ -82,7 +82,7 @@ def places_details(place_id: str):
     fields = ",".join([
         "name","place_id","formatted_address","international_phone_number","website",
         "opening_hours","photos","rating","user_ratings_total","types","geometry/location",
-        "accessibility_options"
+        "reviews"  # <-- include reviews (up to 5 most relevant)
     ])
     params = {"place_id": place_id, "fields": fields, "key": PLACES_API_KEY}
     try:
@@ -92,6 +92,7 @@ def places_details(place_id: str):
     except Exception:
         pass
     return None
+
 
 def find_best_place_id(clinic_name: str, address: str, website: str):
     # Try most-specific query first
@@ -190,6 +191,95 @@ def accessibility_from_places(details: dict):
 def photos_count_from_places(details: dict):
     if not details or details.get("status") != "OK": return "Search limited"
     return len(details["result"].get("photos", []))
+
+def extract_reviews_from_places(details_json):
+    """
+    Returns (reviews_list, rating_float_or_None, total_reviews_or_None)
+    reviews_list: list of dicts with keys: rating, text, time, author_name (subset)
+    """
+    if not details_json or details_json.get("status") != "OK":
+        return [], None, None
+    res = details_json["result"]
+    reviews = res.get("reviews", []) or []
+    simplified = []
+    for rv in reviews:
+        simplified.append({
+            "rating": rv.get("rating"),
+            "text": rv.get("text") or "",
+            "time": rv.get("time"),
+            "author_name": rv.get("author_name")
+        })
+    rating = res.get("rating")
+    total = res.get("user_ratings_total")
+    return simplified, (float(rating) if rating is not None else None), (int(total) if total is not None else None)
+
+
+def analyze_review_texts(reviews):
+    """
+    Very lightweight keyword-based analysis (no external NLP).
+    Returns:
+      - sentiment_highlights (str)
+      - top_positive_themes (str)
+      - top_negative_themes (str)
+    """
+    if not reviews:
+        return "Search limited", "Search limited", "Search limited"
+
+    # Canonical theme keywords (extend as you wish)
+    positive_themes = {
+        "friendly staff": ["friendly", "kind", "caring", "nice", "welcoming", "courteous"],
+        "cleanliness": ["clean", "hygienic", "spotless"],
+        "pain-free experience": ["painless", "no pain", "gentle", "pain free", "comfortable"],
+        "professionalism": ["professional", "expert", "knowledgeable"],
+        "communication": ["explained", "explain", "transparent", "informative"]
+    }
+    negative_themes = {
+        "long wait": ["wait", "waiting", "late", "delay", "overbooked"],
+        "billing issues": ["billing", "charges", "overcharged", "insurance problem", "invoice"],
+        "front desk experience": ["front desk", "reception", "rude", "unhelpful"],
+        "pain/discomfort": ["painful", "hurt", "rough", "uncomfortable"],
+        "upselling": ["upsell", "salesy", "sold me", "pushy"]
+    }
+
+    # Flatten reviews to one text blob
+    texts = " ".join((rv.get("text") or "") for rv in reviews).lower()
+
+    def count_theme_hits(theme_dict):
+        counts = {}
+        for theme, kws in theme_dict.items():
+            c = 0
+            for kw in kws:
+                c += texts.count(kw.lower())
+            if c > 0:
+                counts[theme] = c
+        # sort by count desc
+        return sorted(counts.items(), key=lambda x: x[1], reverse=True)
+
+    pos_hits = count_theme_hits(positive_themes)
+    neg_hits = count_theme_hits(negative_themes)
+
+    # Sentiment highlights summary (quick & dirty)
+    pos_total = sum(cnt for _, cnt in pos_hits)
+    neg_total = sum(cnt for _, cnt in neg_hits)
+    if pos_total == 0 and neg_total == 0:
+        sentiment_summary = "Mixed/neutral (few obvious themes)"
+    elif pos_total >= neg_total:
+        sentiment_summary = f"Mostly positive mentions ({pos_total} vs {neg_total})"
+    else:
+        sentiment_summary = f"Mixed with notable concerns ({neg_total} negatives vs {pos_total} positives)"
+
+    # Build readable theme strings (top 3)
+    def to_theme_str(items):
+        if not items:
+            return "None detected"
+        top = items[:3]
+        return "; ".join([f"{name} ({cnt})" for name, cnt in top])
+
+    top_pos_str = to_theme_str(pos_hits)
+    top_neg_str = to_theme_str(neg_hits)
+
+    return sentiment_summary, top_pos_str, top_neg_str
+
 
 # ------------------------ Google Custom Search ------------------------
 def appears_on_page1_for_dentist_near_me(website: str, clinic_name: str, address: str):
@@ -383,16 +473,30 @@ else:
     }
 
     # 3) Reputation (from Places)
-    rating_str, review_count = rating_reviews_from_places(details) if details else ("Search limited","Search limited")
+    # --- Reputation (from Places) ---
+    reviews, rating_val, total_reviews = extract_reviews_from_places(details) if details else ([], None, None)
+
+    # Average rating string
+    rating_str = (f"{rating_val}/5" if isinstance(rating_val, (int, float)) else "Search limited")
+    # Total review count
+    review_count_out = (total_reviews if isinstance(total_reviews, int) else "Search limited")
+
+    # Sentiment + themes from first ~5 Google reviews
+    sentiment_summary, top_pos_str, top_neg_str = analyze_review_texts(reviews)
+
+    # Review response rate: not available via Places; requires GBP API for owned locations
+    response_rate_str = "Not available via Places API (GBP needed)"
+
     reputation = {
         "Google Reviews (Avg)": rating_str,
-        "Total Google Reviews": review_count,
-        "Sentiment Highlights": "Search limited",
+        "Total Google Reviews": review_count_out,
+        "Sentiment Highlights": sentiment_summary,
         "Yelp / Healthgrades / Zocdoc": "Search limited",
-        "Top Positive Themes": "Search limited",
-        "Top Negative Themes": "Search limited",
-        "Review Response Rate": "Search limited"
+        "Top Positive Themes": top_pos_str,
+        "Top Negative Themes": top_neg_str,
+        "Review Response Rate": response_rate_str
     }
+
 
     # 4) Marketing Signals
     site_media = media_count_from_site(soup)
