@@ -65,6 +65,9 @@ def places_text_search(query: str):
     url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
     params = {"query": query, "key": PLACES_API_KEY}
     r = requests.get(url, params=params, timeout=10)
+    data = resp.json()
+    st.sidebar.write("Places status:", data.get("status"))
+    st.sidebar.write("Places error_message:", data.get("error_message"))
     return r.json() if r.status_code == 200 else None
 
 def places_find_place(text_query: str):
