@@ -479,7 +479,7 @@ else:
     # Average rating string
     rating_str = (f"{rating_val}/5" if isinstance(rating_val, (int, float)) else "Search limited")
     # Total review count
-    review_count_out = (total_reviews if isinstance(total_reviews, int) else "Search limited")
+    review_count = (total_reviews if isinstance(total_reviews, int) else "Search limited")
 
     # Sentiment + themes from first ~5 Google reviews
     sentiment_summary, top_pos_str, top_neg_str = analyze_review_texts(reviews)
@@ -489,7 +489,7 @@ else:
 
     reputation = {
         "Google Reviews (Avg)": rating_str,
-        "Total Google Reviews": review_count_out,
+        "Total Google Reviews": review_count,
         "Sentiment Highlights": sentiment_summary,
         "Yelp / Healthgrades / Zocdoc": "Search limited",
         "Top Positive Themes": top_pos_str,
