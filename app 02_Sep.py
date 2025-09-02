@@ -1,5 +1,5 @@
 # app.py
-import os, io, re, time, math
+import os, io, re, time, math, tempfile
 from urllib.parse import urlparse
 
 import requests
@@ -8,9 +8,14 @@ from bs4 import BeautifulSoup
 import streamlit as st
 import plotly.graph_objects as go
 
-# HTML templating & PDF (Cloud-safe)
+# PDF templating
 from jinja2 import Environment, FileSystemLoader, select_autoescape
-from xhtml2pdf import pisa  # pure-Python PDF engine (works on Streamlit Cloud)
+
+try:
+    from weasyprint import HTML
+    WEASYPRINT_OK = True
+except Exception:
+    WEASYPRINT_OK = False
 
 # ------------------------ Page & Config ------------------------
 st.set_page_config(page_title="Dental Clinic Smile Audit (API-Enhanced)", layout="wide")
@@ -23,7 +28,7 @@ CSE_CX         = st.secrets.get("GOOGLE_CSE_CX", os.getenv("GOOGLE_CSE_CX"))
 
 DEBUG = st.sidebar.checkbox("Show debug info")
 
-# Template paths
+# Paths for the HTML→PDF template
 TEMPLATES_DIR = os.path.join(os.getcwd(), "templates")
 ASSETS_DIR = os.path.join(TEMPLATES_DIR, "assets")
 os.makedirs(ASSETS_DIR, exist_ok=True)
@@ -42,29 +47,28 @@ def ensure_default_template():
   --white: #FFFFFF;
 }
 * { box-sizing: border-box; }
-body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
+body { font-family: 'Inter', Arial, Helvetica, sans-serif; color: var(--text); }
 .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--primary); color: var(--white); border-radius: 10px; }
 .brand { display: flex; align-items: center; gap: 10px; }
 .brand img { height: 28px; width: auto; }
-.brand .title { font-weight: bold; font-size: 18px; }
+.brand .title { font-weight: 700; font-size: 18px; }
 .clinic-name { font-size: 13px; opacity: 0.9; }
 .wrap { margin-top: 12px; }
 .row { display: flex; gap: 12px; }
 .card { flex: 1; border: 1px solid #E5E7EB; border-radius: 12px; background: var(--white); padding: 10px 12px; }
 .card h3 { margin: 0 0 6px 0; font-size: 12px; color: var(--text); }
-.kv { font-size: 12px; line-height: 1.35; color: var(--text); }
+.kv { font-size: 11.5px; line-height: 1.35; color: var(--text); }
 .small { font-size: 11px; color: var(--muted); }
-.section-title { margin: 12px 0 6px 0; font-size: 13px; font-weight: bold; }
-.grid-2 { display: table; width: 100%; }
-.grid-2 .cell { display: table-cell; width: 50%; padding-right: 6px; }
-.kpi { display: table; width: 100%; margin: 8px 0; }
-.kpi .left { display: table-cell; width: 140px; vertical-align: middle; }
-.kpi .right { display: table-cell; vertical-align: middle; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; background: var(--bg); color: var(--text); }
+.section-title { margin: 12px 0 6px 0; font-size: 13px; font-weight: 700; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gauge { display: flex; align-items: center; gap: 14px; margin: 12px 0; }
+.gauge .donut { width: 120px; height: 120px; border-radius: 60px;
+  background: conic-gradient(var(--green) {{ smile_pct }}%, #E5E7EB 0);
+  display: flex; align-items: center; justify-content: center; color: var(--text); font-weight: 700; font-size: 18px; border: 6px solid var(--bg); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; background: var(--bg); color: var(--text); }
 .footer { margin-top: 6px; text-align: center; font-size: 10px; color: var(--muted); }
     """.strip()
 
-    # NOTE: xhtml2pdf has limited CSS (no conic-gradients/SVG). We embed a PNG gauge image.
     html_template = """
 <!DOCTYPE html>
 <html>
@@ -77,7 +81,7 @@ body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
   <div class="header">
     <div class="brand">
       {% if logo_exists %}
-        <img src="{{ logo_path }}" alt="Logo"/>
+        <img src="assets/logo.png" alt="Logo"/>
       {% endif %}
       <div class="title">AI Smile Audit</div>
     </div>
@@ -85,13 +89,13 @@ body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
   </div>
 
   <div class="wrap">
-    <div class="kpi">
-      <div class="left"><img src="{{ gauge_path }}" alt="Smile Gauge" style="width:120px;height:120px;"/></div>
-      <div class="right">
+    <div class="gauge">
+      <div class="donut">{{ smile_score }}/100</div>
+      <div>
         <div class="section-title">Bucket Scores</div>
-        <div class="kv">Visibility (30%): <b>{{ vis_score }}</b></div>
-        <div class="kv">Reputation (40%): <b>{{ rep_score }}</b></div>
-        <div class="kv">Experience (30%): <b>{{ exp_score }}</b></div>
+        <div class="kv">Visibility (30%): <strong>{{ vis_score }}</strong></div>
+        <div class="kv">Reputation (40%): <strong>{{ rep_score }}</strong></div>
+        <div class="kv">Experience (30%): <strong>{{ exp_score }}</strong></div>
       </div>
     </div>
 
@@ -118,7 +122,7 @@ body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
     <div class="section-title">Top Recommendations</div>
     <div class="grid-2">
       {% for rec in recommendations %}
-        <div class="cell"><div class="card small">{{ rec }}</div></div>
+        <div class="card small">{{ rec }}</div>
       {% endfor %}
     </div>
 
@@ -130,6 +134,7 @@ body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
 
     css_path = os.path.join(TEMPLATES_DIR, "styles.css")
     html_path = os.path.join(TEMPLATES_DIR, "smile_report.html")
+
     if not os.path.exists(css_path):
         with open(css_path, "w", encoding="utf-8") as f:
             f.write(styles_css)
@@ -139,13 +144,24 @@ body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
 
 ensure_default_template()
 
-# Optional: upload your logo (PNG) from sidebar and persist to /templates/assets/logo.png
+# Logo uploader (optional)
 st.sidebar.markdown("### Branding")
 logo_file = st.sidebar.file_uploader("Upload logo (PNG)", type=["png"])
 if logo_file is not None:
     with open(os.path.join(ASSETS_DIR, "logo.png"), "wb") as f:
         f.write(logo_file.getbuffer())
     st.sidebar.success("Logo uploaded")
+
+def build_pdf_html(context: dict) -> bytes:
+    if not WEASYPRINT_OK:
+        st.error("WeasyPrint is not installed or missing system deps. Install `weasyprint` and platform dependencies.")
+        return b""
+    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR),
+                      autoescape=select_autoescape(['html', 'xml']))
+    template = env.get_template("smile_report.html")
+    html_str = template.render(**context)
+    pdf = HTML(string=html_str, base_url=TEMPLATES_DIR).write_pdf()
+    return pdf
 
 # ------------------------ Utility & API helpers ------------------------
 def fetch_html(url: str):
@@ -450,6 +466,7 @@ def compute_smile_score(wh_pct, social_present, rating, reviews_total, booking, 
 def advise(metric, value):
     if value is None: return ""
     s = str(value).strip().lower()
+    # Blank if API-limited/problematic
     for marker in ["search limited", "not available via places api", "request_denied", "invalid request", "permission denied", "zero_results"]:
         if marker in s: return ""
 
@@ -628,7 +645,7 @@ experience = {
     "Accessibility Signals": "Search limited"
 }
 
-# 6) Competitive
+# 6) Competitive (placeholder)
 competitive = {"Avg Rating of Top 3 Nearby": "Search limited"}
 
 # ------------------------ Scoring ------------------------
@@ -651,7 +668,7 @@ smile, vis_score, rep_score, exp_score = compute_smile_score(
 def section_df(section_dict):
     rows = []
     for k, v in section_dict.items():
-        rows.append({"Metric": k, "Result": v, "What can you do to improve": advise(k, v)})
+        rows.append({"Metric": k, "Result": v, "Comments/ Recommendations": advise(k, v)})
     return pd.DataFrame(rows)
 
 def show_table(title, data_dict):
@@ -680,7 +697,8 @@ with c2:
         ["Reputation (40%)", rep_score],
         ["Experience (30%)", exp_score]
     ], columns=["Bucket", "Score"])
-    bucket_df["What can you do to improve"] = bucket_df["Bucket"].apply(
+    # Add quick advice
+    bucket_df["Comments/ Recommendations"] = bucket_df["Bucket"].apply(
         lambda b: "Double down on content & local SEO" if "Visibility" in b
         else ("Boost reviews & reply to negatives" if "Reputation" in b
               else "Enable online booking & publish hours/insurance")
@@ -720,63 +738,38 @@ st.download_button("⬇️ Download full results (CSV)",
                    file_name=f"{(clinic_name or 'clinic').replace(' ','_')}_smile_audit.csv",
                    mime="text/csv")
 
-# ------------------------ One-page PDF export (HTML → PDF via xhtml2pdf) ------------------------
-# 1) Ensure template exists
-ensure_default_template()
-
-# 2) Create gauge PNG with plotly + kaleido (works on Streamlit Cloud)
-gauge_png_path = os.path.join(ASSETS_DIR, "gauge.png")
-gauge_fig = go.Figure(go.Indicator(
-    mode="gauge+number",
-    value=smile,
-    title={'text': ""},
-    gauge={'axis': {'range': [0, 100]},
-           'bar': {'color': "#2E7D32"},
-           'steps': [{'range': [0, 50], 'color': '#ffe5e5'},
-                     {'range': [50, 75], 'color': '#fff6d6'},
-                     {'range': [75, 100], 'color': '#e6ffe6'}]}
-))
-# Save the image (requires kaleido; included in requirements)
-gauge_fig.write_image(gauge_png_path, scale=2, width=300, height=250)
-
-# 3) Prepare context for HTML template
-logo_path = os.path.join(ASSETS_DIR, "logo.png")
-logo_exists = os.path.exists(logo_path)
-
-# Pick top recommendations (skip blanks)
+# ------------------------ One-page PDF export (HTML → PDF) ------------------------
+logo_exists = os.path.exists(os.path.join(ASSETS_DIR, "logo.png"))
 recs = [
     advise("Search Visibility (Page 1?)", visibility["Search Visibility (Page 1?)"]),
     advise("Google Reviews (Avg)", reputation["Google Reviews (Avg)"]),
     advise("Appointment Booking", experience["Appointment Booking"]),
 ]
 recs = [r for r in recs if r] or ["Keep up the good work!"]
-recs = recs[:4]
 
-env = Environment(loader=FileSystemLoader(TEMPLATES_DIR),
-                  autoescape=select_autoescape(['html', 'xml']))
-template = env.get_template("smile_report.html")
-html_str = template.render(
-    clinic_name=clinic_name or "Clinic",
-    overview=overview,
-    visibility=visibility,
-    reputation=reputation,
-    experience=experience,
-    vis_score=vis_score,
-    rep_score=rep_score,
-    exp_score=exp_score,
-    gauge_path=gauge_png_path,     # absolute path on container
-    logo_exists=logo_exists,
-    logo_path=logo_path
-)
+context = {
+    "clinic_name": clinic_name or "Clinic",
+    "overview": overview,
+    "visibility": visibility,
+    "reputation": reputation,
+    "experience": experience,
+    "smile_score": smile,
+    "vis_score": vis_score,
+    "rep_score": rep_score,
+    "exp_score": exp_score,
+    "smile_pct": max(1, min(100, int(smile))),
+    "recommendations": recs[:4],
+    "logo_exists": logo_exists
+}
 
-# 4) Convert HTML → PDF with xhtml2pdf
-pdf_buffer = io.BytesIO()
-pisa.CreatePDF(src=html_str, dest=pdf_buffer)  # xhtml2pdf reads HTML string and writes to buffer
-pdf_bytes = pdf_buffer.getvalue()
-
-st.download_button(
-    "📄 Download One-Page PDF",
-    data=pdf_bytes,
-    file_name=f"{(clinic_name or 'clinic').replace(' ','_')}_smile_audit.pdf",
-    mime="application/pdf"
-)
+if WEASYPRINT_OK:
+    pdf_bytes = build_pdf_html(context)
+    st.download_button(
+        "📄 Download One-Page PDF",
+        data=pdf_bytes,
+        file_name=f"{(clinic_name or 'clinic').replace(' ','_')}_smile_audit.pdf",
+        mime="application/pdf"
+    )
+else:
+    # st.info("Work in Progress to enable PDF export, install `weasyprint` and its system dependencies (Cairo/Pango).")
+    st.info("Work in Progress to enable PDF export")
