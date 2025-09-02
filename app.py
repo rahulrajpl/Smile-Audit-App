@@ -139,13 +139,13 @@ body { font-family: Arial, Helvetica, sans-serif; color: var(--text); }
 
 ensure_default_template()
 
-# Optional: upload your logo (PNG) from sidebar and persist to /templates/assets/logo.png
-st.sidebar.markdown("### Branding")
-logo_file = st.sidebar.file_uploader("Upload logo (PNG)", type=["png"])
-if logo_file is not None:
-    with open(os.path.join(ASSETS_DIR, "logo.png"), "wb") as f:
-        f.write(logo_file.getbuffer())
-    st.sidebar.success("Logo uploaded")
+# # Optional: upload your logo (PNG) from sidebar and persist to /templates/assets/logo.png
+# st.sidebar.markdown("### Branding")
+# logo_file = st.sidebar.file_uploader("Upload logo (PNG)", type=["png"])
+# if logo_file is not None:
+#     with open(os.path.join(ASSETS_DIR, "logo.png"), "wb") as f:
+#         f.write(logo_file.getbuffer())
+#     st.sidebar.success("Logo uploaded")
 
 # ------------------------ Utility & API helpers ------------------------
 def fetch_html(url: str):
