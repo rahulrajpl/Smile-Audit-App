@@ -1,0 +1,31 @@
+@page { size: A4; margin: 16mm; }
+:root {
+  --primary: #184A75;  /* NeedleTail.ai Blue */
+  --text: #1F2937;     /* Dark text */
+  --muted: #6B7280;    /* Muted text */
+  --bg: #F3F4F6;       /* Light gray */
+  --green: #2E7D32;    /* Success */
+  --red: #D32F2F;      /* Error */
+  --white: #FFFFFF;
+}
+* { box-sizing: border-box; }
+body { font-family: 'Inter', Arial, Helvetica, sans-serif; color: var(--text); }
+.header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--primary); color: var(--white); border-radius: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand img { height: 28px; width: auto; }
+.brand .title { font-weight: 700; font-size: 18px; }
+.clinic-name { font-size: 13px; opacity: 0.9; }
+.wrap { margin-top: 12px; }
+.row { display: flex; gap: 12px; }
+.card { flex: 1; border: 1px solid #E5E7EB; border-radius: 12px; background: var(--white); padding: 10px 12px; }
+.card h3 { margin: 0 0 6px 0; font-size: 12px; color: var(--text); }
+.kv { font-size: 11.5px; line-height: 1.35; color: var(--text); }
+.small { font-size: 11px; color: var(--muted); }
+.section-title { margin: 12px 0 6px 0; font-size: 13px; font-weight: 700; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.gauge { display: flex; align-items: center; gap: 14px; margin: 12px 0; }
+.gauge .donut { width: 120px; height: 120px; border-radius: 60px;
+  background: conic-gradient(var(--green) {{ smile_pct }}%, #E5E7EB 0);
+  display: flex; align-items: center; justify-content: center; color: var(--text); font-weight: 700; font-size: 18px; border: 6px solid var(--bg); }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; background: var(--bg); color: var(--text); }
+.footer { margin-top: 6px; text-align: center; font-size: 10px; color: var(--muted); }

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>{{ clinic_name }} — Smile Audit</title>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+  <div class="header">
+    <div class="brand">
+      {% if logo_exists %}
+        <img src="assets/logo.png" alt="Logo"/>
+      {% endif %}
+      <div class="title">AI Smile Audit</div>
+    </div>
+    <div class="clinic-name">{{ clinic_name }}</div>
+  </div>
+
+  <div class="wrap">
+    <div class="gauge">
+      <div class="donut">{{ smile_score }}/100</div>
+      <div>
+        <div class="section-title">Bucket Scores</div>
+        <div class="kv">Visibility (30%): <strong>{{ vis_score }}</strong></div>
+        <div class="kv">Reputation (40%): <strong>{{ rep_score }}</strong></div>
+        <div class="kv">Experience (30%): <strong>{{ exp_score }}</strong></div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <h3>Practice Overview</h3>
+        <div class="kv"><span class="badge">Address</span> {{ overview.Address }}</div>
+        <div class="kv"><span class="badge">Phone</span> {{ overview.Phone }}</div>
+        <div class="kv"><span class="badge">Website</span> {{ overview.Website }}</div>
+        <div class="kv"><span class="badge">Years</span> {{ overview['Years in Operation'] }}</div>
+        <div class="kv"><span class="badge">Specialties</span> {{ overview['Specialties Highlighted'] }}</div>
+      </div>
+
+      <div class="card">
+        <h3>Key KPIs</h3>
+        <div class="kv"><span class="badge">GBP</span> {{ visibility['GBP Completeness (estimate)'] }}</div>
+        <div class="kv"><span class="badge">Website Health</span> {{ visibility['Website Health Score'] }}</div>
+        <div class="kv"><span class="badge">Search Visibility</span> {{ visibility['Search Visibility (Page 1?)'] }}</div>
+        <div class="kv"><span class="badge">Google Rating</span> {{ reputation['Google Reviews (Avg)'] }}</div>
+        <div class="kv"><span class="badge">Total Reviews</span> {{ reputation['Total Google Reviews'] }}</div>
+      </div>
+    </div>
+
+    <div class="section-title">Top Recommendations</div>
+    <div class="grid-2">
+      {% for rec in recommendations %}
+        <div class="card small">{{ rec }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="footer">Generated for {{ clinic_name }}</div>
+  </div>
+</body>
+</html>
