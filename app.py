@@ -1464,23 +1464,49 @@ def build_pdf_report(ctx: dict) -> bytes:
     pdf.multi_cell(EPW, 6, txt=_safe(score_block, has_unicode))
 
 
-    def section(title: str, d: dict, max_rows: int = 8):
-        if not d: return
+    def section(title: str, data, max_rows: int = 8):
+    """
+    Render a simple '- key: value' list for a dict (or any mapping-like).
+    Uses the effective page width (EPW) and ASCII dashes for robustness.
+    """
+        if not data:
+            return
+
+        # Normalize to a list of (key, value) pairs
+        if isinstance(data, dict):
+            items = list(data.items())
+        else:
+            # best-effort fallback for other iterables / scalars
+            try:
+                items = list(data)
+                # If it's a flat list like ["a","b"], label them
+                if items and not isinstance(items[0], (tuple, list)):
+                    items = [(str(i+1), str(v)) for i, v in enumerate(items)]
+            except Exception:
+                items = [("Value", str(data))]
+
+        items = items[:max_rows]
+
+        # Title line
         pdf.ln(2)
-        pdf.set_font(font_family, size=12)
+        pdf.set_font(font_family, style="B", size=12)
         pdf.set_x(pdf.l_margin)
         pdf.cell(EPW, 7, txt=_safe(title, has_unicode), ln=1)
+
+        # Body lines
         pdf.set_font(font_family, size=10)
-        for k, v in rows:
-            text = f"- {k}: {v}"  # ASCII dash, avoids Unicode bullet width issues
+        for k, v in items:
+            line = f"- {k}: {v}"  # ASCII dash (avoid Unicode bullet)
             pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(EPW, 5, txt=_safe(text, has_unicode))
+            pdf.multi_cell(EPW, 5, txt=_safe(line, has_unicode))
 
 
-    section("Practice Overview", ctx.get("overview"))
-    section("Online Presence & Visibility", ctx.get("visibility"))
-    section("Patient Reputation & Feedback", ctx.get("reputation"))
-    section("Patient Experience & Accessibility", ctx.get("experience"))
+
+    section("Practice Overview", ctx.get("overview") or {})
+    section("Online Presence & Visibility", ctx.get("visibility") or {})
+    section("Patient Reputation & Feedback", ctx.get("reputation") or {})
+    section("Patient Experience & Accessibility", ctx.get("experience") or {})
+
 
     recs = ctx.get("recommendations") or []
     if recs:
