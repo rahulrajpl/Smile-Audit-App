@@ -18,12 +18,12 @@ st.subheader("Free tool to evaluate your practice's online presence & patient ex
 PLACES_API_KEY = st.secrets.get("GOOGLE_PLACES_API_KEY", os.getenv("GOOGLE_PLACES_API_KEY"))
 CSE_API_KEY    = st.secrets.get("GOOGLE_CSE_API_KEY", os.getenv("GOOGLE_CSE_API_KEY"))
 CSE_CX         = st.secrets.get("GOOGLE_CSE_CX", os.getenv("GOOGLE_CSE_CX"))
-
+CORE_FONT = "Helvetica"
 DEBUG = st.sidebar.checkbox("Show debug info")
 # For Clinic's Logo upload
 ASSETS_DIR = os.path.join(os.getcwd(), "assets")
 os.makedirs(ASSETS_DIR, exist_ok=True)
-UNICODE_FONT_PATH = os.path.join(ASSETS_DIR, "DejaVuSans.ttf")
+# UNICODE_FONT_PATH = os.path.join(ASSETS_DIR, "DejaVuSans.ttf")
 
 # Logo uploader (optional)
 st.sidebar.markdown("### Branding")
@@ -1384,73 +1384,211 @@ st.download_button("⬇️ Download full results (CSV)",
 
 # ------------------------ One-page PDF export ------------------------------------
 
-def _ensure_font(pdf: FPDF) -> str:
-    """
-    If a Unicode TTF is present, register it and use it.
-    Returns the font family name to use in set_font().
-    """
-    if os.path.exists(UNICODE_FONT_PATH):
-        try:
-            pdf.add_font("DejaVu", "", UNICODE_FONT_PATH, uni=True)
-            return "DejaVu"
-        except Exception:
-            pass
-    return "Helvetica"  # core font (Latin-1 only)
+# def _ensure_font(pdf: FPDF) -> str:
+#     """
+#     If a Unicode TTF is present, register it and use it.
+#     Returns the font family name to use in set_font().
+#     """
+#     if os.path.exists(UNICODE_FONT_PATH):
+#         try:
+#             pdf.add_font("DejaVu", "", UNICODE_FONT_PATH, uni=True)
+#             return "DejaVu"
+#         except Exception:
+#             pass
+#     return "Helvetica"  # core font (Latin-1 only)
 
-def _safe(text: str, unicode_font: bool) -> str:
+
+# def _safe(text: str, unicode_font: bool) -> str:
+#     """
+#     Ensure text won’t break PDF generation:
+#     - If Unicode font available: pass through.
+#     - Else: replace smart punctuation and strip non-Latin-1 gracefully.
+#     """
+#     s = "" if text is None else str(text)
+#     if unicode_font:
+#         return s
+#     # replace common smart punctuation with ASCII
+#     s = (s.replace("\u2014", "-").replace("\u2013", "-")
+#            .replace("\u2018", "'").replace("\u2019", "'")
+#            .replace("\u201c", '"').replace("\u201d", '"'))
+#     # strip remaining non-Latin-1
+#     try:
+#         s.encode("latin-1")
+#         return s
+#     except UnicodeEncodeError:
+#         return unicodedata.normalize("NFKD", s).encode("latin-1", "ignore").decode("latin-1")
+
+
+
+# # def build_pdf_report(ctx: dict) -> bytes:
+#     """
+#     Build a single-page PDF summary using fpdf2 (Streamlit-friendly).
+#     Expects in ctx: clinic_name, smile_score, vis_score, rep_score, exp_score,
+#     overview, visibility, reputation, experience, recommendations, logo_exists.
+#     """
+#     pdf = FPDF(orientation="P", unit="mm", format="A4")
+#     pdf.set_auto_page_break(auto=True, margin=12)
+#     pdf.add_page()
+#     # Ensure sane margins & effective writable width
+#     pdf.set_left_margin(12)
+#     pdf.set_right_margin(12)
+#     EPW = pdf.w - pdf.l_margin - pdf.r_margin  # effective page width
+
+#     # font_family = _ensure_font(pdf)
+#     # has_unicode = (font_family == "DejaVu")
+
+#     # Header
+#     pdf.set_font(font_family, size=16)
+#     title = f"AI Smile Audit — {ctx.get('clinic_name','Clinic')}"
+#     pdf.multi_cell(0, 10, txt=_safe(title, has_unicode))
+
+#     # Optional logo at top-right (you already save it as assets/logo.png) :contentReference[oaicite:2]{index=2}
+#     logo_path = os.path.join(ASSETS_DIR, "logo.png")
+#     if ctx.get("logo_exists") and os.path.exists(logo_path):
+#         try:
+#             pdf.image(logo_path, x=170, y=10, w=25)
+#         except Exception:
+#             pass
+
+#     # Scores
+#     pdf.set_font(font_family, size=12)
+
+#     # Use ASCII dashes instead of bullets to avoid odd width issues
+#     score_block = (
+#         f"Smile Score: {ctx.get('smile_score','-')}/100\n"
+#         "Bucket Breakdown:\n"
+#         f"- Visibility (30%): {ctx.get('vis_score','-')}\n"
+#         f"- Reputation (40%): {ctx.get('rep_score','-')}\n"
+#         f"- Experience (30%): {ctx.get('exp_score','-')}\n"
+#     )
+
+#     # Reset cursor to left margin and write using the effective width
+#     pdf.set_x(pdf.l_margin)
+#     pdf.multi_cell(EPW, 6, txt=_safe(score_block, has_unicode))
+
+
+#     def section(title: str, data, max_rows: int = 8):
+#         """
+#         Render a simple '- key: value' list for a dict (or any mapping-like).
+#         Uses the effective page width (EPW) and ASCII dashes for robustness.
+#         """
+#         if not data:
+#             return
+
+#         # Normalize to a list of (key, value) pairs
+#         if isinstance(data, dict):
+#             items = list(data.items())
+#         else:
+#             # best-effort fallback for other iterables / scalars
+#             try:
+#                 items = list(data)
+#                 # If it's a flat list like ["a","b"], label them
+#                 if items and not isinstance(items[0], (tuple, list)):
+#                     items = [(str(i+1), str(v)) for i, v in enumerate(items)]
+#             except Exception:
+#                 items = [("Value", str(data))]
+
+#         items = items[:max_rows]
+
+#         # Title line
+#         pdf.ln(2)
+#         pdf.set_font(font_family, style="B", size=12)
+#         pdf.set_x(pdf.l_margin)
+#         pdf.cell(EPW, 7, txt=_safe(title, has_unicode), ln=1)
+
+#         # Body lines
+#         pdf.set_font(font_family, size=10)
+#         for k, v in items:
+#             line = f"- {k}: {v}"  # ASCII dash (avoid Unicode bullet)
+#             pdf.set_x(pdf.l_margin)
+#             pdf.multi_cell(EPW, 5, txt=_safe(line, has_unicode))
+
+
+
+#     section("Practice Overview", ctx.get("overview") or {})
+#     section("Online Presence & Visibility", ctx.get("visibility") or {})
+#     section("Patient Reputation & Feedback", ctx.get("reputation") or {})
+#     section("Patient Experience & Accessibility", ctx.get("experience") or {})
+
+
+#     recs = ctx.get("recommendations") or []
+#     if recs:
+#         pdf.ln(2)
+#         pdf.set_font(font_family, size=12)
+#         pdf.cell(0, 7, txt=_safe("Top Recommendations", has_unicode), ln=1)
+#         pdf.set_font(font_family, size=10)
+#         for r in recs[:6]:
+#             pdf.multi_cell(0, 5, txt=_safe(f"• {r}", has_unicode))
+
+#     # Return bytes in a Streamlit-friendly way
+#     out = pdf.output(dest="S")
+#     return out if isinstance(out, (bytes, bytearray)) else out.encode("latin-1", "ignore")
+
+
+# --- PDF: core-font only (Helvetica), no external TTFs ---
+
+from fpdf import FPDF
+import unicodedata
+import os
+
+CORE_FONT = "Helvetica"  # built-in; supports "", "B", "I" styles
+
+def _safe_core(text: str) -> str:
     """
-    Ensure text won’t break PDF generation:
-    - If Unicode font available: pass through.
-    - Else: replace smart punctuation and strip non-Latin-1 gracefully.
+    Sanitize text for core fonts (Latin-1 only).
+    - Replace smart punctuation & bullets
+    - Replace emojis/marks commonly used in UI with ASCII stand-ins
+    - Strip any remaining non-Latin-1 glyphs
     """
-    s = "" if text is None else str(text)
-    if unicode_font:
-        return s
-    # replace common smart punctuation with ASCII
+    if text is None:
+        return ""
+    s = str(text)
+
+    # smart punctuation / bullets -> ASCII
     s = (s.replace("\u2014", "-").replace("\u2013", "-")
            .replace("\u2018", "'").replace("\u2019", "'")
-           .replace("\u201c", '"').replace("\u201d", '"'))
-    # strip remaining non-Latin-1
-    try:
-        s.encode("latin-1")
-        return s
-    except UnicodeEncodeError:
-        return unicodedata.normalize("NFKD", s).encode("latin-1", "ignore").decode("latin-1")
+           .replace("\u201c", '"').replace("\u201d", '"')
+           .replace("•", "-"))
+
+    # common emoji markers used in UI -> ASCII stand-ins
+    s = (s.replace("✅", "[ok]")
+           .replace("❌", "[x]")
+           .replace("⚠️", "[!]")
+           .replace("💡", "[*]"))
+
+    # strip anything outside Latin-1
+    s = unicodedata.normalize("NFKD", s).encode("latin-1", "ignore").decode("latin-1")
+    return s
+
 
 def build_pdf_report(ctx: dict) -> bytes:
-    """
-    Build a single-page PDF summary using fpdf2 (Streamlit-friendly).
-    Expects in ctx: clinic_name, smile_score, vis_score, rep_score, exp_score,
-    overview, visibility, reputation, experience, recommendations, logo_exists.
-    """
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=12)
-    pdf.add_page()
-    # Ensure sane margins & effective writable width
     pdf.set_left_margin(12)
     pdf.set_right_margin(12)
-    EPW = pdf.w - pdf.l_margin - pdf.r_margin  # effective page width
+    pdf.add_page()
 
-    font_family = _ensure_font(pdf)
-    has_unicode = (font_family == "DejaVu")
+    # Effective page width
+    EPW = pdf.w - pdf.l_margin - pdf.r_margin
 
-    # Header
-    pdf.set_font(font_family, size=16)
-    title = f"AI Smile Audit — {ctx.get('clinic_name','Clinic')}"
-    pdf.multi_cell(0, 10, txt=_safe(title, has_unicode))
+    # ---------- Header ----------
+    pdf.set_font(CORE_FONT, size=16)
+    title = f"AI Smile Audit - {ctx.get('clinic_name','Clinic')}"
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(EPW, 9, txt=_safe_core(title))
 
-    # Optional logo at top-right (you already save it as assets/logo.png) :contentReference[oaicite:2]{index=2}
+    # Optional logo at top-right
+    ASSETS_DIR = os.path.join(os.getcwd(), "assets")
     logo_path = os.path.join(ASSETS_DIR, "logo.png")
     if ctx.get("logo_exists") and os.path.exists(logo_path):
         try:
-            pdf.image(logo_path, x=170, y=10, w=25)
+            # place small logo in the top-right area
+            pdf.image(logo_path, x=pdf.w - pdf.r_margin - 25, y=10, w=25)
         except Exception:
             pass
 
-    # Scores
-    pdf.set_font(font_family, size=12)
-
-    # Use ASCII dashes instead of bullets to avoid odd width issues
+    # ---------- Score block ----------
+    pdf.set_font(CORE_FONT, size=12)
     score_block = (
         f"Smile Score: {ctx.get('smile_score','-')}/100\n"
         "Bucket Breakdown:\n"
@@ -1458,66 +1596,61 @@ def build_pdf_report(ctx: dict) -> bytes:
         f"- Reputation (40%): {ctx.get('rep_score','-')}\n"
         f"- Experience (30%): {ctx.get('exp_score','-')}\n"
     )
-
-    # Reset cursor to left margin and write using the effective width
     pdf.set_x(pdf.l_margin)
-    pdf.multi_cell(EPW, 6, txt=_safe(score_block, has_unicode))
+    pdf.multi_cell(EPW, 6, txt=_safe_core(score_block))
 
-
+    # ---------- Section helper ----------
     def section(title: str, data, max_rows: int = 8):
         """
-        Render a simple '- key: value' list for a dict (or any mapping-like).
-        Uses the effective page width (EPW) and ASCII dashes for robustness.
+        Render a simple list for dict-like data.
+        Uses ASCII dashes and the effective page width.
         """
         if not data:
             return
 
-        # Normalize to a list of (key, value) pairs
+        # Normalize to list of (key,value)
         if isinstance(data, dict):
             items = list(data.items())
         else:
-            # best-effort fallback for other iterables / scalars
             try:
                 items = list(data)
-                # If it's a flat list like ["a","b"], label them
                 if items and not isinstance(items[0], (tuple, list)):
-                    items = [(str(i+1), str(v)) for i, v in enumerate(items)]
+                    items = [(str(i + 1), str(v)) for i, v in enumerate(items)]
             except Exception:
                 items = [("Value", str(data))]
-
         items = items[:max_rows]
 
-        # Title line
         pdf.ln(2)
-        pdf.set_font(font_family, style="B", size=12)
+        pdf.set_font(CORE_FONT, "B", 12)
         pdf.set_x(pdf.l_margin)
-        pdf.cell(EPW, 7, txt=_safe(title, has_unicode), ln=1)
+        pdf.cell(EPW, 7, txt=_safe_core(title), ln=1)
 
-        # Body lines
-        pdf.set_font(font_family, size=10)
+        pdf.set_font(CORE_FONT, size=10)
         for k, v in items:
-            line = f"- {k}: {v}"  # ASCII dash (avoid Unicode bullet)
+            line = f"- {k}: {v}"
             pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(EPW, 5, txt=_safe(line, has_unicode))
+            pdf.multi_cell(EPW, 5, txt=_safe_core(line))
 
-
-
+    # ---------- Body sections ----------
     section("Practice Overview", ctx.get("overview") or {})
     section("Online Presence & Visibility", ctx.get("visibility") or {})
     section("Patient Reputation & Feedback", ctx.get("reputation") or {})
     section("Patient Experience & Accessibility", ctx.get("experience") or {})
 
-
+    # ---------- Recommendations ----------
     recs = ctx.get("recommendations") or []
     if recs:
         pdf.ln(2)
-        pdf.set_font(font_family, size=12)
-        pdf.cell(0, 7, txt=_safe("Top Recommendations", has_unicode), ln=1)
-        pdf.set_font(font_family, size=10)
-        for r in recs[:6]:
-            pdf.multi_cell(0, 5, txt=_safe(f"• {r}", has_unicode))
+        pdf.set_font(CORE_FONT, "B", 12)
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(EPW, 7, txt=_safe_core("Top Recommendations"), ln=1)
 
-    # Return bytes in a Streamlit-friendly way
+        pdf.set_font(CORE_FONT, size=10)
+        for r in recs[:6]:
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(EPW, 5, txt=_safe_core(f"- {r}"))
+
+    # ---------- Bytes out ----------
     out = pdf.output(dest="S")
     return out if isinstance(out, (bytes, bytearray)) else out.encode("latin-1", "ignore")
 
