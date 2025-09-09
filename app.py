@@ -1465,10 +1465,10 @@ def build_pdf_report(ctx: dict) -> bytes:
 
 
     def section(title: str, data, max_rows: int = 8):
-    """
-    Render a simple '- key: value' list for a dict (or any mapping-like).
-    Uses the effective page width (EPW) and ASCII dashes for robustness.
-    """
+        """
+        Render a simple '- key: value' list for a dict (or any mapping-like).
+        Uses the effective page width (EPW) and ASCII dashes for robustness.
+        """
         if not data:
             return
 
