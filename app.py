@@ -1426,6 +1426,10 @@ def build_pdf_report(ctx: dict) -> bytes:
     pdf = FPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
+    # Ensure sane margins & effective writable width
+    pdf.set_left_margin(12)
+    pdf.set_right_margin(12)
+    EPW = pdf.w - pdf.l_margin - pdf.r_margin  # effective page width
 
     font_family = _ensure_font(pdf)
     has_unicode = (font_family == "DejaVu")
@@ -1445,24 +1449,33 @@ def build_pdf_report(ctx: dict) -> bytes:
 
     # Scores
     pdf.set_font(font_family, size=12)
+
+    # Use ASCII dashes instead of bullets to avoid odd width issues
     score_block = (
-        f"Smile Score: {ctx.get('smile_score','—')}/100\n"
-        f"Bucket Breakdown:\n"
-        f"  • Visibility (30%): {ctx.get('vis_score','—')}\n"
-        f"  • Reputation (40%): {ctx.get('rep_score','—')}\n"
-        f"  • Experience (30%): {ctx.get('exp_score','—')}\n"
+        f"Smile Score: {ctx.get('smile_score','-')}/100\n"
+        "Bucket Breakdown:\n"
+        f"- Visibility (30%): {ctx.get('vis_score','-')}\n"
+        f"- Reputation (40%): {ctx.get('rep_score','-')}\n"
+        f"- Experience (30%): {ctx.get('exp_score','-')}\n"
     )
-    pdf.multi_cell(0, 6, txt=_safe(score_block, has_unicode))
+
+    # Reset cursor to left margin and write using the effective width
+    pdf.set_x(pdf.l_margin)
+    pdf.multi_cell(EPW, 6, txt=_safe(score_block, has_unicode))
+
 
     def section(title: str, d: dict, max_rows: int = 8):
         if not d: return
         pdf.ln(2)
         pdf.set_font(font_family, size=12)
-        pdf.cell(0, 7, txt=_safe(title, has_unicode), ln=1)
+        pdf.set_x(pdf.l_margin)
+        pdf.cell(EPW, 7, txt=_safe(title, has_unicode), ln=1)
         pdf.set_font(font_family, size=10)
-        for k, v in list(d.items())[:max_rows]:
-            line = f"• {k}: {v}"
-            pdf.multi_cell(0, 5, txt=_safe(line, has_unicode))
+        for k, v in rows:
+            text = f"- {k}: {v}"  # ASCII dash, avoids Unicode bullet width issues
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(EPW, 5, txt=_safe(text, has_unicode))
+
 
     section("Practice Overview", ctx.get("overview"))
     section("Online Presence & Visibility", ctx.get("visibility"))
