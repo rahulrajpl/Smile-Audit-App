@@ -11,11 +11,11 @@ import plotly.graph_objects as go
 # PDF templating
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-try:
-    from weasyprint import HTML
-    WEASYPRINT_OK = True
-except Exception:
-    WEASYPRINT_OK = False
+# try:
+#     from weasyprint import HTML
+#     WEASYPRINT_OK = True
+# except Exception:
+#     WEASYPRINT_OK = False
 
 # ------------------------ Page & Config ------------------------
 st.set_page_config(page_title="Dental Clinic Smile Audit (API-Enhanced)", layout="wide")
@@ -152,16 +152,16 @@ if logo_file is not None:
         f.write(logo_file.getbuffer())
     st.sidebar.success("Logo uploaded")
 
-def build_pdf_html(context: dict) -> bytes:
-    if not WEASYPRINT_OK:
-        st.error("WeasyPrint is not installed or missing system deps. Install `weasyprint` and platform dependencies.")
-        return b""
-    env = Environment(loader=FileSystemLoader(TEMPLATES_DIR),
-                      autoescape=select_autoescape(['html', 'xml']))
-    template = env.get_template("smile_report.html")
-    html_str = template.render(**context)
-    pdf = HTML(string=html_str, base_url=TEMPLATES_DIR).write_pdf()
-    return pdf
+# def build_pdf_html(context: dict) -> bytes:
+#     if not WEASYPRINT_OK:
+#         st.error("WeasyPrint is not installed or missing system deps. Install `weasyprint` and platform dependencies.")
+#         return b""
+#     env = Environment(loader=FileSystemLoader(TEMPLATES_DIR),
+#                       autoescape=select_autoescape(['html', 'xml']))
+#     template = env.get_template("smile_report.html")
+#     html_str = template.render(**context)
+#     pdf = HTML(string=html_str, base_url=TEMPLATES_DIR).write_pdf()
+#     return pdf
 
 # ------------------------ Utility & API helpers ------------------------
 def fetch_html(url: str):
@@ -762,14 +762,14 @@ context = {
     "logo_exists": logo_exists
 }
 
-if WEASYPRINT_OK:
-    pdf_bytes = build_pdf_html(context)
-    st.download_button(
-        "📄 Download One-Page PDF",
-        data=pdf_bytes,
-        file_name=f"{(clinic_name or 'clinic').replace(' ','_')}_smile_audit.pdf",
-        mime="application/pdf"
-    )
-else:
-    # st.info("Work in Progress to enable PDF export, install `weasyprint` and its system dependencies (Cairo/Pango).")
-    st.info("Work in Progress to enable PDF export")
+# if WEASYPRINT_OK:
+#     pdf_bytes = build_pdf_html(context)
+#     st.download_button(
+#         "📄 Download One-Page PDF",
+#         data=pdf_bytes,
+#         file_name=f"{(clinic_name or 'clinic').replace(' ','_')}_smile_audit.pdf",
+#         mime="application/pdf"
+#     )
+# else:
+#     # st.info("Work in Progress to enable PDF export, install `weasyprint` and its system dependencies (Cairo/Pango).")
+#     st.info("Work in Progress to enable PDF export")
