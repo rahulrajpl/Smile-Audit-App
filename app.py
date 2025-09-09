@@ -1652,7 +1652,20 @@ def build_pdf_report(ctx: dict) -> bytes:
 
     # ---------- Bytes out ----------
     out = pdf.output(dest="S")
-    return out if isinstance(out, (bytes, bytearray)) else out.encode("latin-1", "ignore")
+
+    # Streamlit expects `bytes` (not `bytearray` or `str`)
+    if isinstance(out, bytearray):
+        pdf_bytes = bytes(out)
+    elif isinstance(out, bytes):
+        pdf_bytes = out
+    elif isinstance(out, str):
+        pdf_bytes = out.encode("latin-1", "ignore")
+    else:
+        # last-resort cast
+        pdf_bytes = bytes(out)
+
+    return pdf_bytes
+
 
 
 # ------------------------ One-page PDF export (fpdf2) ------------------------
